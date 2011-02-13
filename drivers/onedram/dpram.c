@@ -26,7 +26,7 @@
 #define CONFIG_ONEDRAM_HWREV
 */
 
-#define CONFIG_USE_KMALLOC	// For FSR Read DMA
+//#define CONFIG_USE_KMALLOC	// For FSR Read DMA
 /*--------------------------------------------------------------------------- 
  * Debug Feature
  * _DEBUG 				: printing dump message
@@ -68,6 +68,7 @@
 #endif	/* CONFIG_PROC_FS */
 
 #include <linux/wakelock.h>
+
 
 #if defined(CONFIG_ONEDRAM_IRQPENDING)
 

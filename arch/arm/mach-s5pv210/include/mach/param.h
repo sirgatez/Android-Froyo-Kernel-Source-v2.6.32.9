@@ -19,7 +19,7 @@
 #define LCD_LEVEL			0x061	/* Backlight Level */
 #define BOOT_DELAY			0		/* Boot Wait Time */
 #define LOAD_RAMDISK		0		/* Enable Ramdisk Loading */
-#define SWITCH_SEL			1		/* Switch Setting (UART[1], USB[0]) */
+#define SWITCH_SEL			3		/* Switch Setting (UART[1], USB[0]) */
 #define PHONE_DEBUG_ON		0		/* Enable Phone Debug Mode */
 #define LCD_DIM_LEVEL		0x011	/* Backlight Dimming Level */
 #define LCD_DIM_TIME		0

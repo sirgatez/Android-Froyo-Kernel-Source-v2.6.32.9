@@ -863,10 +863,10 @@ INT32   FSR_BML_EraseRefresh     (UINT32        nVol,
 /* APIs only used in DPM                                                     */
 /*****************************************************************************/
 
-#if !(defined(FSR_NBL2) || defined(TINY_FSR))
+//#if !(defined(FSR_NBL2) || defined(TINY_FSR))
 VOID    FSR_BML_AcquireSM        (UINT32        nVol);
 VOID    FSR_BML_ReleaseSM        (UINT32        nVol);
-#endif
+//#endif
 
 /*****************************************************************************/
 /* APIs only used in STL                                                     */

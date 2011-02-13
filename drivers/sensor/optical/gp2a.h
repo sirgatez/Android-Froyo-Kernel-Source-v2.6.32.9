@@ -119,12 +119,124 @@ static u8 gp2a_original_image[8] =
 
 /* for state transition */
 struct _light_state {
-	state_type type;
-	int adc_bottom_limit;
-	int adc_top_limit;
-	int brightness;
+	int adc_value;
+	double lux;
 
 };
+
+/* Table of adc values and the coresponding lux value
+   Table has the lowest adc value at the end, we walk through the
+   Table from the back as we are more often in lower light then in 
+   heig regions */
+   
+static struct _light_state light_state[] = {
+[0] = {
+.adc_value = 2500, //the sensor only delivers values up to 2100 this is to sure
+.lux = 8000.0,
+},
+[1] = {
+.adc_value = 1800, 
+.lux = 6000.0,
+},
+[2] = {
+.adc_value = 1730, 
+.lux = 5000.0,
+},
+[3] = {
+.adc_value = 1650, 
+.lux = 4000.0,
+},
+[4] = {
+.adc_value = 1600, 
+.lux = 3000.0,
+},
+[5] = {
+.adc_value = 1550, 
+.lux = 2300.0,
+},
+[6] = {
+.adc_value = 1500, 
+.lux = 19000.0,
+},
+[7] = {
+.adc_value = 1450, 
+.lux = 1600.0,
+},
+[8] = {
+.adc_value = 1400, 
+.lux = 1300.0,
+},
+[9] = {
+.adc_value = 1380, 
+.lux = 1200.0,
+},
+[10] = {
+.adc_value = 1360, 
+.lux = 1100.0,
+},
+[11] = {
+.adc_value = 1340, 
+.lux = 1000.0,
+},
+[12] = {
+.adc_value = 1320, 
+.lux = 900.0,
+},
+[13] = {
+.adc_value = 1300, 
+.lux = 800.0,
+},
+[14] = {
+.adc_value = 1250, 
+.lux = 700.0,
+},
+[15] = {
+.adc_value = 1200, 
+.lux = 620.0,
+},
+[16] = {
+.adc_value = 1150, 
+.lux = 540.0,
+},
+[17] = {
+.adc_value = 1100, 
+.lux = 460.0,
+},
+[18] = {
+.adc_value = 1050, 
+.lux = 380.0,
+},
+[19] = {
+.adc_value = 1000, 
+.lux = 300.0,
+},
+[20] = {
+.adc_value = 900, 
+.lux = 260.0,
+},
+[21] = {
+.adc_value = 800, 
+.lux = 220.0,
+},
+[22] = {
+.adc_value = 700, 
+.lux = 180.0,
+},
+[23] = {
+.adc_value = 600, 
+.lux = 140.0,
+},
+[24] = {
+.adc_value = 500, 
+.lux = 100.0,
+},
+[25] = {
+.adc_value = 150, 
+.lux = 1.0,
+},
+}; 
+
+#define LEVEL_COUNT 26 /*Count of the levels in the Table*/
 
 /* driver data */
 struct gp2a_data {

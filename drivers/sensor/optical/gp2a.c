@@ -23,6 +23,8 @@
 
 #include <linux/input.h>
 #include <linux/workqueue.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
 #include <asm/uaccess.h>
 
 //#include <linux/regulator/max8998_function.h>
@@ -52,11 +54,8 @@ struct device *switch_cmd_dev;
 int autobrightness_mode = OFF;
 static bool light_enable = OFF;
 static bool proximity_enable = OFF;
-static state_type cur_state = LIGHT_INIT;
 
-static int adc_value_buf[ADC_BUFFER_NUM] = {0, 0, 0, 0, 0, 0};
-
-//static int state_change_count = 0;
+static int adcvalue = 0;
 
 static short proximity_value = 0;
 static int cur_adc_value = 0;
@@ -65,10 +64,6 @@ static bool lightsensor_test = 0;
 
 static struct wake_lock prx_wake_lock;
 
-//static bool light_init_check = false;
-//static int light_init_check_count = 0;
-
-//static int light_init_period = 4;
 static ktime_t timeA,timeB; /* timeSub; */
 
 
@@ -144,70 +139,6 @@ EXPORT_SYMBOL(gp2a_get_lightsensor_status);
  *                 
  */
 
-static int buffering = 2;
-
-extern int backlight_level;
-
-#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-int pre_val = -1;
-extern int current_gamma_value;
-extern u16 *pmDNIe_Gamma_set[];
-
-typedef enum
-{
-	mDNIe_UI_MODE,
-	mDNIe_VIDEO_MODE,
-	mDNIe_VIDEO_WARM_MODE,
-	mDNIe_VIDEO_COLD_MODE,
-	mDNIe_CAMERA_MODE,
-	mDNIe_NAVI
-}Lcd_mDNIe_UI;
-
-extern Lcd_mDNIe_UI current_mDNIe_UI;
-
-extern void mDNIe_Mode_set_for_backlight(u16 *buf);
-
-int value_buf[4] = {0};
-
-
-int IsChangedADC(int val)
-{
-	int j = 0;
-	int ret = 0;
-
-	int adc_index = 0;
-	static int adc_index_count = 0;
-
-
-	adc_index = (adc_index_count)%4;		
-	adc_index_count++;
-
-	if(pre_val == -1) //ADC buffer initialize 
-	{
-		for(j = 0; j<4; j++)
-			value_buf[j] = val;
-
-		pre_val = 0;
-	}
-    else
-    {
-    	value_buf[adc_index] = val;
-	}
-
-	ret = ((value_buf[0] == value_buf[1])&& \
-			(value_buf[1] == value_buf[2])&& \
-			(value_buf[2] == value_buf[3]))? 1 : 0;
-
-	
-	if(adc_index_count == 4)
-		adc_index_count = 0;
-
-	return ret;
-}
-#endif
-
-
-#if defined(CONFIG_ARIES_LATONA)
 
 static void gp2a_work_func_light(struct work_struct *work)
 {
@@ -217,392 +148,18 @@ static void gp2a_work_func_light(struct work_struct *work)
 	/* read adc data from s5p110 */
 	adc = lightsensor_get_adcvalue();
 	gprintk("Optimized adc = %d \n",adc);
-	gprintk("cur_state = %d\n",cur_state);
 	gprintk("light_enable = %d\n",light_enable);
-	
-	/*
-	  *	Brightness By Lightsensor Specification.
-	  *	
-	  *	LIGHT_LEVEL4  :   1500 lux ~	: 300cd
-	  *	LIGHT_LEVEL3	 :    ~ 1500 lux	: 190cd
-	  *	LIGHT_LEVEL2	 :    ~ 0150 lux	: 130cd
-	  *	LIGHT_LEVEL1	 : 0 ~ 0015 lux	:  70cd
-	  */
-
-	if(adc >= 1114)
-	{
-		level_state = LIGHT_LEVEL4;
-		buffering = 4;
-	}
-
-	else if(adc >= 1094)  // 1094 ~ 1113
-	{
-		if(buffering == 4)
-		{	
-			level_state = LIGHT_LEVEL4;
-			buffering = 4;
-		}
-		else if((buffering == 1)||(buffering == 2)||(buffering == 3))
-		{
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
-	}
-	
-	else if(adc >= 510)
-	{
-		level_state = LIGHT_LEVEL3;
-		buffering = 3;
-	}
-
-	else if(adc >= 417 ) // 417 ~ 509
-	{
-		if((buffering == 3)||(buffering == 4))
-		{	
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
-		else if((buffering == 1)||(buffering == 2))
-		{
-			level_state = LIGHT_LEVEL2;
-			buffering = 2;
-		}
-	}
-
-	else if(adc >= 43)
-	{
-		level_state = LIGHT_LEVEL2;
-		buffering = 2;
-	}
-	
-	else if(adc >= 34) // 34 ~ 42
-	{
-		if((buffering == 2)||(buffering == 3)||(buffering == 4))
-		{	
-			level_state = LIGHT_LEVEL2;
-			buffering = 2;
-		}
-		else if(buffering == 1)
-		{
-			level_state = LIGHT_LEVEL1;
-			buffering = 1;
-		}
-	}
-
-	else if(adc < 34)
-	{
-		level_state = LIGHT_LEVEL1;
-		buffering = 1;
-	}
-	if((backlight_level > 5)&&(!lightsensor_test))    // backlight level is normal, not test mode
-	{
-		gprintk("backlight_level = %d\n", backlight_level); //Temp
-		cur_state = level_state;	
-	}
-#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-	if(autobrightness_mode)
-	{
-		#define MAX_BACKLIGHT_VALUE	255 // 192
-		if((pre_val!=1)&&(current_gamma_value == MAX_BACKLIGHT_VALUE)&&(level_state == LIGHT_LEVEL4)&&(current_mDNIe_UI == mDNIe_UI_MODE))
-		{	
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[1]);
-			pre_val = 1;
-			gprintk("mDNIe_Mode_set_for_backlight - pmDNIe_Gamma_set[1]\n" );
-		}
-	}
-#endif
-		
-	
-//	printk("==========adc = %d, cur_state = %d\n", adc, cur_state); //Temp
+	adcvalue = adc;
 }
-
-
-#else  ////////////////////////////////////////////
-
-#if 1
-
-static void gp2a_work_func_light(struct work_struct *work)
-{
-	int adc=0;
-	state_type level_state = LIGHT_INIT;
-
-	/* read adc data from s5p110 */
-	adc = lightsensor_get_adcvalue();
-	gprintk("Optimized adc = %d \n",adc);
-	gprintk("cur_state = %d\n",cur_state);
-	gprintk("light_enable = %d\n",light_enable);
-#if 1 //add 150lux
-	if(adc >= 2100)
-	{
-		level_state = LIGHT_LEVEL5;
-		buffering = 5;
-	}
-	else if(adc >= 1900 && adc < 2100)
-	{
-		if(buffering == 5)
-		{	
-			level_state = LIGHT_LEVEL5;
-			buffering = 5;
-		}
-		else if((buffering == 1)||(buffering == 2)||(buffering == 3)||(buffering == 4))
-		{
-			level_state = LIGHT_LEVEL4;
-			buffering = 4;
-		}
-	}
-
-	else if(adc >= 1800 && adc < 1900)
-	{
-		level_state = LIGHT_LEVEL4;
-		buffering = 4;
-	}
-
-	else if(adc >= 1200 && adc < 1800)
-	{
-		if((buffering == 4)||(buffering == 5))
-		{	
-			level_state = LIGHT_LEVEL4;
-			buffering = 4;
-		}
-		else if((buffering == 1)||(buffering == 2)||(buffering == 3))
-		{
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
-	}
-	
-	else if(adc >= 800 && adc < 1200)
-	{
-		level_state = LIGHT_LEVEL3;
-		buffering = 3;
-	}
-
-	else if(adc >= 600 && adc < 800)
-	{
-		if((buffering == 3)||(buffering == 4)||(buffering == 5))
-		{	
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
-		else if((buffering == 1)||(buffering == 2))
-		{
-			level_state = LIGHT_LEVEL2;
-			buffering = 2;
-		}
-	}
-
-	else if(adc >= 400 && adc < 600)
-	{
-		level_state = LIGHT_LEVEL2;
-		buffering = 2;
-	}
-	
-	else if(adc >= 250 && adc < 400)
-	{
-		if((buffering == 2)||(buffering == 3)||(buffering == 4)||(buffering == 5))
-		{	
-			level_state = LIGHT_LEVEL2;
-			buffering = 2;
-		}
-		else if(buffering == 1)
-		{
-			level_state = LIGHT_LEVEL1;
-			buffering = 1;
-		}
-	}
-
-	else if(adc < 250)
-	{
-		level_state = LIGHT_LEVEL1;
-		buffering = 1;
-	}
-#endif
-	if((backlight_level > 5)&&(!lightsensor_test))
-	{
-		gprintk("backlight_level = %d\n", backlight_level); //Temp
-		cur_state = level_state;	
-	}
-#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-	if(autobrightness_mode)
-	{
-	#if defined(CONFIG_ARIES_LATONA)
-		#define MAX_BACKLIGHT_VALUE	192
-		if((pre_val!=1)&&(current_gamma_value == MAX_BACKLIGHT_VALUE)&&(level_state == LIGHT_LEVEL5)&&(current_mDNIe_UI == mDNIe_UI_MODE))
-	#else
-		if((pre_val!=1)&&(current_gamma_value == 24)&&(level_state == LIGHT_LEVEL5)&&(current_mDNIe_UI == mDNIe_UI_MODE))
-	#endif
-		{	
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[1]);
-			pre_val = 1;
-			gprintk("mDNIe_Mode_set_for_backlight - pmDNIe_Gamma_set[1]\n" );
-		}
-	}
-#endif
-		
-	
-	gprintk("cur_state = %d\n",cur_state); //Temp
-}
-
-#else // Modify NTTS1
-static void gp2a_work_func_light(struct work_struct *work)
-{
-	int adc=0;
-	state_type level_state = LIGHT_INIT;
-
-	/* read adc data from s5p110 */
-	adc = lightsensor_get_adcvalue();
-	gprintk("Optimized adc = %d \n",adc);
-	gprintk("cur_state = %d\n",cur_state);
-	gprintk("light_enable = %d\n",light_enable);
-#if 0
-	if(adc >= 1500)
-		level_state = LIGHT_LEVEL3;
-
-	else if(adc >= 100 && adc < 1500){
-		level_state = LIGHT_LEVEL2;
-	}
-
-	else if(adc < 100){
-		level_state = LIGHT_LEVEL1;
-	}
-#else
-	if(adc >= 2100)
-	{
-		level_state = LIGHT_LEVEL4;
-		buffering = 4;
-	}
-
-	else if(adc >= 1900 && adc < 2100)
-	{
-		if(buffering == 4)
-		{	
-			level_state = LIGHT_LEVEL4;
-			buffering = 4;
-		}
-		else if((buffering == 1)||(buffering == 2)||(buffering == 3))
-		{
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
-	}
-	
-	else if(adc >= 1800 && adc < 1900)
-	{
-		level_state = LIGHT_LEVEL3;
-	}
-
-	else if(adc >= 1200 && adc < 1800)
-	{
-		if((buffering == 3)||(buffering == 4))
-		{	
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
-		else if((buffering == 1)||(buffering == 2))
-		{
-			level_state = LIGHT_LEVEL2;
-			buffering = 2;
-		}
-	}
-
-	else if(adc >= 500 && adc < 1200)
-	{
-		level_state = LIGHT_LEVEL2;
-		buffering = 2;
-	}
-	
-	else if(adc >= 80 && adc < 500)
-	{
-		if((buffering == 2)||(buffering == 3)||(buffering == 4))
-		{	
-			level_state = LIGHT_LEVEL2;
-			buffering = 2;
-		}
-		else if(buffering == 1)
-		{
-			level_state = LIGHT_LEVEL1;
-			buffering = 1;
-		}
-	}
-
-	else if(adc < 80)
-	{
-		level_state = LIGHT_LEVEL1;
-		buffering = 1;
-	}
-#endif
-	if((backlight_level > 5)&&(!lightsensor_test))
-	{
-		gprintk("backlight_level = %d\n", backlight_level); //Temp
-		cur_state = level_state;	
-	}
-#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-	if(autobrightness_mode)
-	{
-		if((pre_val!=1)&&(current_gamma_value == 24)&&(level_state == LIGHT_LEVEL4)&&(current_mDNIe_UI == mDNIe_UI_MODE))
-		{	
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[1]);
-			pre_val = 1;
-			gprintk("mDNIe_Mode_set_for_backlight - pmDNIe_Gamma_set[1]\n" );
-		}
-	}
-#endif
-		
-	
-	gprintk("cur_state = %d\n",cur_state); //Temp
-}
-#endif
-
-#endif // #if defined(CONFIG_ARIES_LATONA)
 
 int lightsensor_get_adcvalue(void)
 {
-	int i = 0;
-	int j = 0;
-	unsigned int adc_total = 0;
-	static int adc_avr_value = 0;
-	unsigned int adc_index = 0;
-	static unsigned int adc_index_count = 0;
-	unsigned int adc_max = 0;
-	unsigned int adc_min = 0;
 	int value =0;
 
 	//get ADC
 	value = s3c_adc_get_adc_data(ADC_CHANNEL);
 	gprintk("adc = %d \n",value);
-	cur_adc_value = value;
-	
-	adc_index = (adc_index_count++)%ADC_BUFFER_NUM;		
-
-	if(cur_state == LIGHT_INIT) //ADC buffer initialize (light sensor off ---> light sensor on)
-	{
-		for(j = 0; j<ADC_BUFFER_NUM; j++)
-			adc_value_buf[j] = value;
-	}
-    else
-    {
-    	adc_value_buf[adc_index] = value;
-	}
-	
-	adc_max = adc_value_buf[0];
-	adc_min = adc_value_buf[0];
-
-	for(i = 0; i <ADC_BUFFER_NUM; i++)
-	{
-		adc_total += adc_value_buf[i];
-
-		if(adc_max < adc_value_buf[i])
-			adc_max = adc_value_buf[i];
-					
-		if(adc_min > adc_value_buf[i])
-			adc_min = adc_value_buf[i];
-	}
-	adc_avr_value = (adc_total-(adc_max+adc_min))/(ADC_BUFFER_NUM-2);
-	
-	if(adc_index_count == ADC_BUFFER_NUM-1)
-		adc_index_count = 0;
-
-	return adc_avr_value;
+	return value;
 }
 
 
@@ -621,109 +178,10 @@ static enum hrtimer_restart gp2a_timer_func(struct hrtimer *timer)
 	
 	queue_work(gp2a_wq, &gp2a->work_light);
 	//hrtimer_start(&gp2a->timer,ktime_set(LIGHT_PERIOD,0),HRTIMER_MODE_REL);
-	light_polling_time = ktime_set(0,0);
-	light_polling_time = ktime_add_us(light_polling_time,500000);
+	light_polling_time = ktime_set(LIGHT_PERIOD,0);
 	hrtimer_start(&gp2a->timer,light_polling_time,HRTIMER_MODE_REL);
 	return HRTIMER_NORESTART;
 }
-
-
-
-
-/*****************************************************************************************
- *  
- *  function    : gp2a_work_func_prox 
- *  description : This function is for proximity sensor (using B-1 Mode ). 
- *                when INT signal is occured , it gets value from VO register.   
- *
- *                 
- */
-#if defined(CONFIG_GP2A_MODE_B)
-static void gp2a_work_func_prox(struct work_struct *work)
-{
-	struct gp2a_data *gp2a = container_of(work, struct gp2a_data, work_prox);
-	
-	unsigned char value;
-	unsigned char int_val=REGS_PROX;
-	unsigned char vout=0;
-
-	/* Read VO & INT Clear */
-	
-	gprintk("[PROXIMITY] %s : \n",__func__);
-
-	if(INT_CLEAR)
-	{
-		int_val = REGS_PROX | (1 <<7);
-	}
-	opt_i2c_read((u8)(int_val),&value,1);
-	vout = value & 0x01;
-	printk(KERN_INFO "[PROXIMITY] value = %d \n",vout);
-
-	wake_lock_timeout(&prx_wake_lock, 3*HZ);
-
-	/* Report proximity information */
-	proximity_value = vout;
-
-/*	
-	if(proximity_value ==0)
-	{
-		timeB = ktime_get();
-		
-		timeSub = ktime_sub(timeB,timeA);
-		printk(KERN_INFO "[PROXIMITY] timeSub sec = %d, timeSub nsec = %d \n",timeSub.tv.sec,timeSub.tv.nsec);
-		
-		if (timeSub.tv.sec>=3 )
-		{
-		    wake_lock_timeout(&prx_wake_lock,HZ/2);
-			printk(KERN_INFO "[PROXIMITY] wake_lock_timeout : HZ/2 \n");
-		}
-		else
-			printk(KERN_INFO "[PROXIMITY] wake_lock is already set \n");
-
-	}
-*/
-	if(USE_INPUT_DEVICE)
-	{
-    	input_report_abs(gp2a->input_dev,ABS_DISTANCE,(int)vout);
-    	input_sync(gp2a->input_dev);
-	
-	
-		mdelay(1);
-	}
-
-	/* Write HYS Register */
-
-	if(!vout)
-	{
-		value = 0x40;
-
-
-	}
-	else
-	{
-		value = 0x20;
-
-	}
-	opt_i2c_write((u8)(REGS_HYS),&value);
-
-	/* Forcing vout terminal to go high */
-
-	//value = 0x18;
-	//opt_i2c_write((u8)(REGS_CON),&value);
-
-
-	/* enable INT */
-
-	enable_irq(gp2a->irq);
-
-	/* enabling VOUT terminal in nomal operation */
-
-	value = 0x00;
-
-	opt_i2c_write((u8)(REGS_CON),&value);
-
-}
-#endif
 
 irqreturn_t gp2a_irq_handler(int irq, void *dev_id)
 {
@@ -868,33 +326,11 @@ void gp2a_on(struct gp2a_data *gp2a, int type)
 	gprintk(KERN_INFO "[OPTICAL] gp2a_on(%d)\n",type);
 	if(type == PROXIMITY)
 	{
-		#if 0
-		gprintk("[PROXIMITY] go nomal mode : power on \n");
-		value = 0x18;
-		opt_i2c_write((u8)(REGS_CON),&value);
-
-		value = 0x40;
-		opt_i2c_write((u8)(REGS_HYS),&value);
-
-		value = 0x01;
-		opt_i2c_write((u8)(REGS_OPMOD),&value);
-		
-		gprintk("enable irq for proximity\n");
-		enable_irq(gp2a ->irq);
-
-		value = 0x00;
-		opt_i2c_write((u8)(REGS_CON),&value);
-		
-		value = 0x01;
-		opt_i2c_write((u8)(REGS_OPMOD),&value);
-		proximity_enable =1;
-		#endif	
 	}
 	if(type == LIGHT)
 	{
 		gprintk(KERN_INFO "[LIGHT_SENSOR] timer start for light sensor\n");
-		light_polling_time = ktime_set(0,0);
-		light_polling_time = ktime_add_us(light_polling_time,500000);
+	    light_polling_time = ktime_set(LIGHT_PERIOD,0);
 	    //hrtimer_start(&gp2a->timer,ktime_set(LIGHT_PERIOD,0),HRTIMER_MODE_REL);
 	    hrtimer_start(&gp2a->timer,light_polling_time,HRTIMER_MODE_REL);
 		light_enable = ON;
@@ -919,31 +355,6 @@ static void gp2a_off(struct gp2a_data *gp2a, int type)
 	gprintk(KERN_INFO "[OPTICAL] gp2a_off(%d)\n",type);
 	if(type == PROXIMITY || type == ALL)
 	{
-
-		#if 0
-		gprintk("[PROXIMITY] go power down mode  \n");
-		
-		//gprintk("disable irq for proximity \n");
-		//disable_irq(gp2a ->irq);
-		
-		value = 0x00;
-		opt_i2c_write((u8)(REGS_OPMOD),&value);
-		
-		proximity_enable =0;
-		proximity_value = 0;
-		#endif
-		
-		#if defined(CONFIG_GP2A_MODE_B)
-		/* set input/pull-down  */
- 		s3c_gpio_cfgpin(GPIO_PS_VOUT, S3C_GPIO_INPUT);
-  		s3c_gpio_setpull(GPIO_PS_VOUT, S3C_GPIO_PULL_DOWN);
-		
-		disable_irq_nosync(gp2a ->irq);
-		
-		// SSD : Software shutdown function ( 0:shutdown mode, 1:opteration mode )
-		value = 0x02;	// VCON enable, SSD disable
-		opt_i2c_write((u8)(REGS_OPMOD),&value);
-		#endif
 	}
 
 	if(type ==LIGHT)
@@ -953,37 +364,6 @@ static void gp2a_off(struct gp2a_data *gp2a, int type)
 		light_enable = OFF;
 	}
 }
-
-
-
-
-/*					 */
-/*					 */
-/*					 */
-/* for  test mode 	start */
-/*					 */
-/*					 */
-static int AdcToLux_Testmode(int adc)
-{
-	unsigned int lux = 0;
-
-	gprintk("[%s] adc:%d\n",__func__,adc);
-	/*temporary code start*/
-	
-	if(adc >= 1800)
-		lux = 100000;
-	
-	else if(adc >= 800 && adc < 1800){
-		lux = 5000;
-	}
-	else if(adc < 800){
-		lux = 10;
-	}
-	/*temporary code end*/
-	
-	return lux;
-}
-
 
 static ssize_t lightsensor_file_state_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -1033,13 +413,6 @@ static ssize_t lightsensor_file_state_store(struct device *dev,
 	{
 		autobrightness_mode = OFF;
 		printk("[brightness_mode] BRIGHTNESS_MODE_USER\n");
-		#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-		if(pre_val==1)
-		{
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[2]);
-		}	
-		pre_val = -1;
-		#endif
 	}
 
 	return size;
@@ -1135,11 +508,12 @@ static int gp2a_opt_probe( struct platform_device* pdev )
 	hrtimer_init(&gp2a->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	gp2a->timer.function = gp2a_timer_func;
 
-    gp2a_wq = create_singlethread_workqueue("gp2a_wq");
-    if (!gp2a_wq)
+
+        gp2a_wq = create_singlethread_workqueue("gp2a_wq");
+        if (!gp2a_wq)
+
 	    return -ENOMEM;
-  //  INIT_WORK(&gp2a->work_prox, gp2a_work_func_prox);
-    INIT_WORK(&gp2a->work_light, gp2a_work_func_light);
+	INIT_WORK(&gp2a->work_light, gp2a_work_func_light);
 
 #if defined(CONFIG_GP2A_MODE_B)
 	gp2a_wq_prox = create_singlethread_workqueue("gp2a_wq_prox");
@@ -1366,74 +740,17 @@ static int gp2a_opt_resume( struct platform_device* pdev )
 	
 	if(light_enable)
 	{
-		#if 0
+		/*
+		ktime_t light_polling_time;
 		gprintk("[%s] : hrtimer_start \n",__func__);
-	       light_polling_time = ktime_set(0,0);
-		light_polling_time = ktime_add_us(light_polling_time,500000);
+		light_polling_time = ktime_set(LIGHT_PERIOD,0);
 		hrtimer_start(&gp2a->timer,light_polling_time,HRTIMER_MODE_REL);
-		#endif
+		*/
 	}
 
 	return 0;
 }
 
-//#if defined(CONFIG_ARIES_EUR)
-#if 1
-static double StateToLux(state_type state)
-{
-	double lux = 0;
-	
-	gprintk("[%s] cur_state:%d\n",__func__,state);
-
-	if(state== LIGHT_LEVEL5){
-		lux = 15000.0;
-	}
-	else if(state == LIGHT_LEVEL4){
-		lux = 9000.0;
-	}
-	else if(state == LIGHT_LEVEL3){
-		lux = 5000.0;
-	}
-	else if(state == LIGHT_LEVEL2){
-		lux = 1000.0;
-	}
-	else if(state == LIGHT_LEVEL1){
-		lux = 6.0;
-	}
-
-	else {
-		lux = 5000.0;
-		gprintk("[%s] cur_state fail\n",__func__);
-	}
-	return lux;
-}
-#else // Modify NTTS1
-static double StateToLux(state_type state)
-{
-	double lux = 0;
-	
-	gprintk("[%s] cur_state:%d\n",__func__,state);
-
-	if(state== LIGHT_LEVEL4){
-		lux = 15000.0;
-	}
-	else if(state == LIGHT_LEVEL3){
-		lux = 9000.0;
-	}
-	else if(state== LIGHT_LEVEL2){
-		lux = 5000.0;
-	}
-	else if(state == LIGHT_LEVEL1){
-		lux = 6.0;
-	}
-
-	else {
-		lux = 5000.0;
-		gprintk("[%s] cur_state fail\n",__func__);
-	}
-	return lux;
-}
-#endif
 
 static int light_open(struct inode *ip, struct file *fp)
 {
@@ -1445,16 +762,44 @@ static int light_open(struct inode *ip, struct file *fp)
 
 }
 
+static double getLuxFromAdc(int adc)
+{
+        int i;
+        double lux = 5000.0;
+       
+        if (adc < light_state[(LEVEL_COUNT-1)].adc_value)
+        {
+                return light_state[(LEVEL_COUNT-1)].lux; 
+        }
+        else
+        {
+       	        for(i=(LEVEL_COUNT-2);i > -1;i--)
+       	        {
+       	                if(adc < light_state[i].adc_value)
+       	                {
+       	                        lux = light_state[i].lux;
+       	                        break;
+       	                }
+       	        }
+       	}
+       	
+       	return lux; //some thing went wrong this should not happen!
+
+}
+
 static ssize_t light_read(struct file *filp, double *lux, size_t count, loff_t *f_pos)
 {
-	double lux_val;
+	double lux_val = 0.0;
+        int adc_val = adcvalue;
 
-	lux_val = StateToLux(cur_state);
-	//printk("GP2A: light_read(): cur_state = %d\n",cur_state);
+	lux_val = getLuxFromAdc(adc_val);//adc_val * 15 / 2; //adc_val *1;//adc_val * 7.5;	
+
 	put_user(lux_val, lux);
-	
+
 	return 1;
 }
+
+
 
 static int light_release(struct inode *ip, struct file *fp)
 {

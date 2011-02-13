@@ -157,7 +157,7 @@ static int s3c_dma_hw_params(struct snd_pcm_substream *substream,
 
 /* To fix the pcm buffer underrun in case of high busy state ( ex. Starting broswer ) 2010.06.22*/
 	if(substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		totbytes = params_buffer_bytes(params) * ANDROID_BUF_NUM;
+		totbytes = params_buffer_bytes(params) * CONFIG_ANDROID_BUF_NUM;
 	
 	else
 		totbytes = params_buffer_bytes(params);
@@ -338,8 +338,8 @@ s3c_dma_pointer(struct snd_pcm_substream *substream)
 /* To fix the pcm buffer underrun in case of high busy state ( ex. Starting broswer ) 2010.06.22*/
 	if(substream->stream == SNDRV_PCM_STREAM_PLAYBACK) 
 	{
-		if (res >= snd_pcm_lib_buffer_bytes(substream) * ANDROID_BUF_NUM) {
-			if (res == snd_pcm_lib_buffer_bytes(substream) * ANDROID_BUF_NUM)
+		if (res >= snd_pcm_lib_buffer_bytes(substream) * CONFIG_ANDROID_BUF_NUM) {
+			if (res == snd_pcm_lib_buffer_bytes(substream) * CONFIG_ANDROID_BUF_NUM)
 				res = 0;
 		}
 	} 

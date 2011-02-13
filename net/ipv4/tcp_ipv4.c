@@ -1542,6 +1542,7 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 	return 0;
 
 reset:
+	if (!skb->dev || (skb->dev->flags & IFF_LOOPBACK))
 	tcp_v4_send_reset(rsk, skb);
 discard:
 	kfree_skb(skb);
@@ -1650,6 +1651,7 @@ no_tcp_socket:
 bad_packet:
 		TCP_INC_STATS_BH(net, TCP_MIB_INERRS);
 	} else {
+		if (skb->dev->flags & IFF_LOOPBACK)
 		tcp_v4_send_reset(NULL, skb);
 	}
 

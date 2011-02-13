@@ -27,7 +27,7 @@ static void __iomem *key_base;
 
    #define KEYPAD_COLUMNS       2
  #define KEYPAD_ROWS    3
- #define MAX_KEYPAD_NR  6
+ #define MAX_KEYPAD_NR  9
 
 #elif defined (CONFIG_MACH_SMDKC110 ) || defined (CONFIG_MACH_S5PC110_P1)
 
@@ -60,7 +60,9 @@ int keypad_keycode[] = {
 		14,  106,  3,  14,  27,  43,  40,  28,      //111			
 
 #elif defined (CONFIG_MACH_S5PC110_ARIES)
-              50,8,0,0,58,42,		// add camera key code for DFTA
+//              50,8,0,0,58,42,		// add camera key code for DFTA
+                50,2,3,34,58,42,34,8,
+                26,10,11,50,13,14,50,16,
 
 #elif defined (CONFIG_MACH_SMDKC110)
 		1,2,3,4,5,6,7,8,
@@ -110,7 +112,7 @@ int keypad_keycode[] = {
 #if defined(CONFIG_CPU_S3C6410)
 #define KEYPAD_DELAY		(50)
 #elif defined(CONFIG_CPU_S5PC100) || defined(CONFIG_CPU_S5PC110) || defined(CONFIG_CPU_S5PV210)
-#define KEYPAD_DELAY		(300)  //600
+#define KEYPAD_DELAY		(50)  //600
 #endif
 
 #define	KEYIFCOL_CLEAR		(readl(key_base+S3C_KEYIFCOL) & ~0xffff)

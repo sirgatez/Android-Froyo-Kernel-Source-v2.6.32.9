@@ -259,7 +259,14 @@ static irqreturn_t s3c_keygpio_vol_up_isr(int irq, void *dev_id)
 	//we cannot check HWREV 0xb and 0xc, we check 2 hw key
 	key_status = (readl(S5PV210_GPH3DAT)) & ((1 << 3));
 
-	INPUT_REPORT_KEY(dev, 42, key_status ? 0 : 1);
+//	INPUT_REPORT_KEY(dev, 42, key_status ? 0 : 1);
+
+        if(key_status == ((1 << 3)))
+                INPUT_REPORT_KEY(dev,42,0);
+        else
+                INPUT_REPORT_KEY(dev,42,1);
+
+
 
 	printk(KERN_DEBUG "s3c_keygpio_vol_up_isr key_status =%d,\n",
 	       key_status);
@@ -274,7 +281,7 @@ static irqreturn_t s3c_keygpio_vol_up26_isr(int irq, void *dev_id)
 	struct s3c_keypad *pdata = (struct s3c_keypad *)dev_id;
 	struct input_dev *dev = pdata->dev;
 
-	key_status = (readl(S5PV210_GPH3DAT)) & ((1 << 2));
+	key_status = (readl(S5PV210_GPH3DAT)) & ((1 << 3));
 
 	INPUT_REPORT_KEY(dev, 42, key_status ? 0 : 1);
 
@@ -352,10 +359,10 @@ static int s3c_keygpio_isr_setup(void *pdev)
 		return ret;
 	}
 	//volume up
-	s3c_gpio_setpull(S5PV210_GPH3(2), S3C_GPIO_PULL_NONE);
-	set_irq_type(IRQ_EINT(26), IRQ_TYPE_EDGE_BOTH);
+	s3c_gpio_setpull(S5PV210_GPH3(3), S3C_GPIO_PULL_NONE);
+	set_irq_type(IRQ_EINT(27), IRQ_TYPE_EDGE_BOTH);
 	ret =
-	    request_irq(IRQ_EINT(26), s3c_keygpio_vol_up26_isr,
+	    request_irq(IRQ_EINT(27), s3c_keygpio_vol_up26_isr,
 			IRQF_SAMPLE_RANDOM, "key vol up(26)", (void *)pdev);
 	if (ret) {
 		printk

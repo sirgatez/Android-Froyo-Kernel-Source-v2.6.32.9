@@ -218,9 +218,9 @@ UINT32  FSR_BuildNumber          (VOID);
 #include "FSR_OAM.h"
 #include "FSR_LLD.h"
 
-#if !defined(FSR_NO_INCLUDE_BML_HEADER)
+//#if !defined(FSR_NO_INCLUDE_BML_HEADER)
 #include "FSR_BML.h"
-#endif
+//#endif
 
 #if !defined(FSR_NO_INCLUDE_STL_HEADER)
 

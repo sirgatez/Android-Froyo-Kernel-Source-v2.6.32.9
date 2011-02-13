@@ -118,7 +118,6 @@ extern void init_mdnie_class(void);
 
 static struct s5p_lcd lcd;
 
-#if !defined(CONFIG_ARIES_NTT)
 static const unsigned short *p22Gamma_set[] = {        
                       
 	s6e63m0_22gamma_30cd,//0                               
@@ -150,6 +149,33 @@ static const unsigned short *p22Gamma_set[] = {
                                                
                                                 
 static const unsigned short *p19Gamma_set[] = {        
+#ifdef CONFIG_VOODOO_COLOR_GAMMA_22_ONLY
+	s6e63m0_22gamma_30cd,//0                               
+	s6e63m0_22gamma_40cd,                         
+	s6e63m0_22gamma_70cd,                         
+	s6e63m0_22gamma_90cd,                         
+	s6e63m0_22gamma_100cd,                     
+	s6e63m0_22gamma_110cd,  //5                      
+	s6e63m0_22gamma_120cd,                        
+	s6e63m0_22gamma_130cd,                        
+	s6e63m0_22gamma_140cd,	                      
+	s6e63m0_22gamma_150cd,                    
+	s6e63m0_22gamma_160cd,   //10                     
+	s6e63m0_22gamma_170cd,                        
+	s6e63m0_22gamma_180cd,                        
+	s6e63m0_22gamma_190cd,	                      
+	s6e63m0_22gamma_200cd,                    
+	s6e63m0_22gamma_210cd,  //15                      
+	s6e63m0_22gamma_220cd,                        
+	s6e63m0_22gamma_230cd,                        
+	s6e63m0_22gamma_240cd,                        
+	s6e63m0_22gamma_250cd,                   
+	s6e63m0_22gamma_260cd,  //20                       
+	s6e63m0_22gamma_270cd,                        
+	s6e63m0_22gamma_280cd,                        
+	s6e63m0_22gamma_290cd,                        
+	s6e63m0_22gamma_300cd,//24                    
+#else
 	s6e63m0_19gamma_30cd,	//0
 	//s6e63m0_19gamma_50cd,                         
 	s6e63m0_19gamma_40cd,     
@@ -177,65 +203,8 @@ static const unsigned short *p19Gamma_set[] = {
 	s6e63m0_19gamma_280cd,
 	s6e63m0_19gamma_290cd,
 	s6e63m0_19gamma_300cd,	//24
-}; 
-#else // Modify NTTS1
-static const unsigned short *p22Gamma_set[] = {        
-	s6e63m0_22gamma_30cd,	 //0                    
-	s6e63m0_22gamma_40cd,  
-	s6e63m0_22gamma_50cd,
-	s6e63m0_22gamma_60cd,
-	s6e63m0_22gamma_70cd,	
-	s6e63m0_22gamma_80cd,	//5
-	s6e63m0_22gamma_90cd,
-	s6e63m0_22gamma_100cd,
-	s6e63m0_22gamma_110cd,	
-	s6e63m0_22gamma_120cd,	
-	s6e63m0_22gamma_130cd,	//10
-	s6e63m0_22gamma_140cd,
-	s6e63m0_22gamma_150cd,
-	s6e63m0_22gamma_160cd,	
-	s6e63m0_22gamma_170cd,	
-	s6e63m0_22gamma_180cd,	//15
-	s6e63m0_22gamma_190cd,
-	s6e63m0_22gamma_200cd,
-	s6e63m0_22gamma_210cd,	
-	s6e63m0_22gamma_220cd,	
-	s6e63m0_22gamma_230cd,	//20
-	s6e63m0_22gamma_240cd,
-	s6e63m0_22gamma_260cd,
-	s6e63m0_22gamma_280cd,
-	s6e63m0_22gamma_300cd, 	//24                   
-};                                             
-                                               
-                                                
-static const unsigned short *p19Gamma_set[] = {     
-	s6e63m0_19gamma_30cd,	//0                     
-	s6e63m0_19gamma_40cd,  
-	s6e63m0_19gamma_50cd,
-	s6e63m0_19gamma_60cd,
-	s6e63m0_19gamma_70cd,	
-	s6e63m0_19gamma_80cd,	//5
-	s6e63m0_19gamma_90cd,
-	s6e63m0_19gamma_100cd,
-	s6e63m0_19gamma_110cd,	
-	s6e63m0_19gamma_120cd,	
-	s6e63m0_19gamma_130cd,	//10
-	s6e63m0_19gamma_140cd,
-	s6e63m0_19gamma_150cd,
-	s6e63m0_19gamma_160cd,	
-	s6e63m0_19gamma_170cd,	
-	s6e63m0_19gamma_180cd,	//15
-	s6e63m0_19gamma_190cd,
-	s6e63m0_19gamma_200cd,
-	s6e63m0_19gamma_210cd,	
-	s6e63m0_19gamma_220cd,	
-	s6e63m0_19gamma_230cd,	//20
-	s6e63m0_19gamma_240cd,
-	s6e63m0_19gamma_260cd,
-	s6e63m0_19gamma_280cd,
-	s6e63m0_19gamma_300cd, 	//24
-}; 
 #endif
+}; 
 
 #ifdef CONFIG_FB_S3C_TL2796_ACL
 static const unsigned short *ACL_cutoff_set[] = {
@@ -790,13 +759,6 @@ static DEVICE_ATTR(aclset_file_cmd,0666, aclset_file_cmd_show, aclset_file_cmd_s
 #endif
 
 
-#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-extern void mDNIe_Mode_set_for_backlight(u16 *buf);
-extern u16 *pmDNIe_Gamma_set[];
-extern int pre_val;
-extern int autobrightness_mode;
-#endif
-
 static void wait_ldi_enable(void)
 {
 	int i = 0;
@@ -924,19 +886,6 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 
 	if (level == BACKLIGHT_LEVEL_OFF)
 		return 0;
-
-#ifdef CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-
-#if defined(CONFIG_ARIES_LATONA)
-	if ((pre_val==1) && (gamma_value < MAX_BACKLIGHT_VALUE) &&(autobrightness_mode)) 	{
-#else
-	if ((pre_val==1) && (gamma_value < 24) &&(autobrightness_mode))		{
-#endif
-		mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[2]);
-		gprintk("s5p_bl_update_status - pmDNIe_Gamma_set[2]\n" );
-		pre_val = -1;
-	}
-#endif
 
 #if defined(CONFIG_ARIES_LATONA)
     printk("[bl]%d", bl);
